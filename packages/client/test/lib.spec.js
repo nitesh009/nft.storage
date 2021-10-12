@@ -33,7 +33,6 @@ describe('client', () => {
     it('upload blob', async () => {
       const client = new NFTStorage({ token, endpoint })
       const cid = await client.storeBlob(new Blob(['hello world']))
-      console.log(cid.toString())
       assert.equal(
         cid,
         'bafkreifzjut3te2nhyekklss27nh3k72ysco7y32koao5eei66wof36n5e'
@@ -58,7 +57,7 @@ describe('client', () => {
       const blob = new Blob(['upload twice'])
 
       try {
-        await client.storeBlob(blob)
+        await client.storeBlob(blob, { maxRetries: 0 })
         assert.unreachable('sholud have failed')
       } catch (error) {
         assert.ok(error instanceof Error)
@@ -70,7 +69,7 @@ describe('client', () => {
       // @ts-expect-error - token option is expected
       const client = new NFTStorage({ endpoint })
       try {
-        await client.storeBlob(new Blob(['blobby']))
+        await client.storeBlob(new Blob(['blobby']), { maxRetries: 0 })
         assert.unreachable('should have thrown')
       } catch (err) {
         assert.is(err.message, 'missing token')
@@ -80,7 +79,7 @@ describe('client', () => {
     it('errors without content', async () => {
       const client = new NFTStorage({ endpoint, token })
       try {
-        await client.storeBlob(new Blob([]))
+        await client.storeBlob(new Blob([]), { maxRetries: 0 })
         assert.unreachable('should have thrown')
       } catch (err) {
         assert.match(err.message, /provide some content/)
@@ -217,11 +216,12 @@ describe('client', () => {
         assert.match(error, /provide some content/i)
       }
     })
+
     it('errors without token', async () => {
       // @ts-expect-error - expects token option
       const client = new NFTStorage({ endpoint })
       try {
-        await client.storeDirectory([new File(['file'], 'file.txt')])
+        await client.storeDirectory([new File(['file'], 'file.txt')], { maxRetries: 0 })
         assert.unreachable('should have thrown')
       } catch (err) {
         assert.is(err.message, 'missing token')
@@ -230,9 +230,8 @@ describe('client', () => {
 
     it('errors with invalid token', async () => {
       const client = new NFTStorage({ token: 'wrong', endpoint })
-
       try {
-        await client.storeDirectory([new File(['wrong token'], 'foo.txt')])
+        await client.storeDirectory([new File(['wrong token'], 'foo.txt')], { maxRetries: 0 })
         assert.unreachable('sholud have failed')
       } catch (error) {
         assert.ok(error instanceof Error)
