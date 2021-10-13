@@ -42,18 +42,15 @@ describe('client', () => {
     it('callback with root CID', async () => {
       let called = false
       const client = new NFTStorage({ token, endpoint })
-      await client.storeBlob(
-        new Blob(['hello world']),
-        {
-          onRootCidReady: root => {
-            called = true
-            assert.equal(
-              root,
-              'bafkreifzjut3te2nhyekklss27nh3k72ysco7y32koao5eei66wof36n5e'
-            )
-          }
-        }
-      )
+      await client.storeBlob(new Blob(['hello world']), {
+        onRootCidReady: (root) => {
+          called = true
+          assert.equal(
+            root,
+            'bafkreifzjut3te2nhyekklss27nh3k72ysco7y32koao5eei66wof36n5e'
+          )
+        },
+      })
       assert.ok(called)
     })
 
@@ -205,18 +202,24 @@ describe('client', () => {
     it('callback with root CID', async () => {
       let called = false
       const client = new NFTStorage({ token, endpoint })
-      await client.storeDirectory([
-        new File(['hello world'], 'hello.txt'),
-        new File(
-          [JSON.stringify({ from: 'incognito' }, null, 2)],
-          'metadata.json'
-        ),
-      ], {
-        onRootCidReady: root => {
-          called = true
-          assert.equal(root, 'bafybeigkms36pnnjsa7t2mq2g4mx77s4no2hilirs4wqx3eebbffy2ay3a')
+      await client.storeDirectory(
+        [
+          new File(['hello world'], 'hello.txt'),
+          new File(
+            [JSON.stringify({ from: 'incognito' }, null, 2)],
+            'metadata.json'
+          ),
+        ],
+        {
+          onRootCidReady: (root) => {
+            called = true
+            assert.equal(
+              root,
+              'bafybeigkms36pnnjsa7t2mq2g4mx77s4no2hilirs4wqx3eebbffy2ay3a'
+            )
+          },
         }
-      })
+      )
       assert.ok(called)
     })
 
@@ -257,7 +260,9 @@ describe('client', () => {
       // @ts-expect-error - expects token option
       const client = new NFTStorage({ endpoint })
       try {
-        await client.storeDirectory([new File(['file'], 'file.txt')], { maxRetries: 0 })
+        await client.storeDirectory([new File(['file'], 'file.txt')], {
+          maxRetries: 0,
+        })
         assert.unreachable('should have thrown')
       } catch (err) {
         assert.is(err.message, 'missing token')
@@ -267,7 +272,9 @@ describe('client', () => {
     it('errors with invalid token', async () => {
       const client = new NFTStorage({ token: 'wrong', endpoint })
       try {
-        await client.storeDirectory([new File(['wrong token'], 'foo.txt')], { maxRetries: 0 })
+        await client.storeDirectory([new File(['wrong token'], 'foo.txt')], {
+          maxRetries: 0,
+        })
         assert.unreachable('sholud have failed')
       } catch (error) {
         assert.ok(error instanceof Error)
