@@ -16,9 +16,10 @@
 
 import { transform } from 'streaming-iterables'
 import pRetry from 'p-retry'
-import { CarReader } from '@ipld/car'
 import { TreewalkCarSplitter } from 'carbites/treewalk'
 import { pack } from 'ipfs-car/pack'
+import { CID } from 'multiformats/cid'
+import { BlockstoreCarReader } from './blockstore.js'
 import * as API from './lib/interface.js'
 import * as Token from './token.js'
 import { fetch, File, Blob, FormData, Blockstore } from './platform.js'
@@ -80,11 +81,11 @@ class NFTStorage {
   /**
    * @param {API.Service} service
    * @param {Blob} blob
-   * @param {import('./lib/interface.js').StoreBlobOptions} [options]
+   * @param {API.BlobStorerOptions} [options]
    * @returns {Promise<API.CIDString>}
    */
   static async storeBlob(
-    { endpoint, token },
+    service,
     blob,
     { onRootCidReady, onStoredChunk, maxRetries } = {}
   ) {
@@ -93,15 +94,18 @@ class NFTStorage {
     }
     const blockstore = new Blockstore()
     try {
-      const { out, root } = await pack({
+      const { root } = await pack({
         // @ts-ignore
         input: [{ path: 'blob', content: blob.stream() }],
         blockstore,
-        wrapWithDirectory: false
+        wrapWithDirectory: false,
       })
       onRootCidReady && onRootCidReady(root.toString())
-      const car = await CarReader.fromIterable(out)
-      return await NFTStorage.storeCar({ endpoint, token }, car, { onStoredChunk, maxRetries })
+      const car = new BlockstoreCarReader(1, [root], blockstore)
+      return await NFTStorage.storeCar(service, car, {
+        onStoredChunk,
+        maxRetries,
+      })
     } finally {
       await blockstore.close()
     }
@@ -110,10 +114,14 @@ class NFTStorage {
   /**
    * @param {API.Service} service
    * @param {Blob|API.CarReader} car
-   * @param {import('./lib/interface.js').StoreCarOptions} [options]
+   * @param {API.CarStorerOptions} [options]
    * @returns {Promise<API.CIDString>}
    */
-  static async storeCar({ endpoint, token }, car, { onStoredChunk, maxRetries } = {}) {
+  static async storeCar(
+    { endpoint, token },
+    car,
+    { onStoredChunk, maxRetries } = {}
+  ) {
     const url = new URL(`upload/`, endpoint)
     const targetSize = MAX_CHUNK_SIZE
     const splitter =
@@ -160,11 +168,11 @@ class NFTStorage {
   /**
    * @param {API.Service} service
    * @param {Iterable<File>} files
-   * @param {import('./lib/interface.js').StoreDirectoryOptions} [options]
+   * @param {API.DirectoryStorerOptions} [options]
    * @returns {Promise<API.CIDString>}
    */
   static async storeDirectory(
-    { endpoint, token },
+    service,
     files,
     { onRootCidReady, onStoredChunk, maxRetries } = {}
   ) {
@@ -183,15 +191,18 @@ class NFTStorage {
 
     const blockstore = new Blockstore()
     try {
-      const { out, root } = await pack({
+      const { root } = await pack({
         // @ts-ignore
         input,
         blockstore,
-        wrapWithDirectory: true
+        wrapWithDirectory: true,
       })
       onRootCidReady && onRootCidReady(root.toString())
-      const car = await CarReader.fromIterable(out)
-      return await NFTStorage.storeCar({ endpoint, token }, car, { onStoredChunk, maxRetries })
+      const car = new BlockstoreCarReader(1, [root], blockstore)
+      return await NFTStorage.storeCar(service, car, {
+        onStoredChunk,
+        maxRetries,
+      })
     } finally {
       await blockstore.close()
     }
@@ -201,31 +212,31 @@ class NFTStorage {
    * @template {API.TokenInput} T
    * @param {API.Service} service
    * @param {T} metadata
+   * @param {API.MetadataStorerOptions} [options]
    * @returns {Promise<API.Token<T>>}
    */
-  static async store({ endpoint, token }, metadata) {
+  static async store(
+    service,
+    metadata,
+    { onRootCidReady, onStoredChunk, maxRetries } = {}
+  ) {
     validateERC1155(metadata)
-
-    const url = new URL(`store/`, endpoint)
-    const body = Token.encode(metadata)
-    const paths = new Set(body.keys())
-
-    const response = await fetch(url.toString(), {
-      method: 'POST',
-      headers: NFTStorage.auth(token),
-      body,
-    })
-
-    /** @type {API.StoreResponse<T>} */
-    const result = await response.json()
-
-    if (result.ok === true) {
-      const { value } = result
-      return Token.decode(value, paths)
-    } else {
-      throw new Error(result.error.message)
+    const blockstore = new Blockstore()
+    try {
+      const token = await Token.Token.encode(metadata, blockstore)
+      onRootCidReady && onRootCidReady(token.ipnft)
+      const car = new BlockstoreCarReader(
+        1,
+        [CID.parse(token.ipnft)],
+        blockstore
+      )
+      await NFTStorage.storeCar(service, car, { onStoredChunk, maxRetries })
+      return token
+    } finally {
+      await blockstore.close()
     }
   }
+
   /**
    * @param {API.Service} service
    * @param {string} cid
@@ -306,7 +317,7 @@ class NFTStorage {
    * ```
    *
    * @param {Blob} blob
-   * @param {import('./lib/interface.js').StoreBlobOptions} [options]
+   * @param {API.BlobStorerOptions} [options]
    */
   storeBlob(blob, options) {
     return NFTStorage.storeBlob(this, blob, options)
@@ -346,7 +357,7 @@ class NFTStorage {
    * console.assert(cid === expectedCid)
    * ```
    * @param {Blob|API.CarReader} car
-   * @param {import('./lib/interface.js').StoreCarOptions} [options]
+   * @param {API.CarStorerOptions} [options]
    */
   storeCar(car, options) {
     return NFTStorage.storeCar(this, car, options)
@@ -367,7 +378,7 @@ class NFTStorage {
    * instance as well, in which case directory structure will be retained.
    *
    * @param {Iterable<File>} files
-   * @param {import('./lib/interface.js').StoreDirectoryOptions} [options]
+   * @param {API.DirectoryStorerOptions} [options]
    */
   storeDirectory(files, options) {
     return NFTStorage.storeDirectory(this, files, options)
