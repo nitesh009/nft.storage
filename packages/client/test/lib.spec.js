@@ -380,12 +380,15 @@ describe('client', () => {
       const client = new NFTStorage({ token: 'wrong', endpoint })
 
       try {
-        await client.store({
-          name: 'name',
-          description: 'tada',
-          image: new Blob([], { type: 'image/png' }),
-        })
-        assert.unreachable('sholud have failed')
+        await client.store(
+          {
+            name: 'name',
+            description: 'tada',
+            image: new Blob([], { type: 'image/png' }),
+          },
+          { maxRetries: 0 }
+        )
+        assert.unreachable('should have failed')
       } catch (error) {
         assert.ok(error instanceof Error)
         assert.match(error, /Unauthorized/)
