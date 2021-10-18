@@ -65,7 +65,7 @@ export const embed = (input, options) =>
 /**
  * @template {API.TokenInput} T
  * @param {API.EncodedToken<T>} value
- * @param {Set<string>} paths - Paths were to expcet EncodedURLs
+ * @param {Set<string>} paths - Paths were to expect EncodedURLs
  * @returns {Token<T>}
  */
 export const decode = ({ ipnft, url, data }, paths) =>
