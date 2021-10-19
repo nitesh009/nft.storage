@@ -53,17 +53,18 @@ export class Token {
   }
 
   /**
-   * Takes token input and encodes it into a Token object. Where values are
-   * discovered `Blob` (or `File`) objects in the given input, they are replaced
-   * with IPFS URLs (an `ipfs://` prefixed CID with an optional path).
+   * Takes token input and encodes creates a new Token instance from it. Where
+   * values are discovered `Blob` (or `File`) objects in the given input, they
+   * are replaced with IPFS URLs (an `ipfs://` prefixed CID with an optional
+   * path).
    *
-   * The passed blockstore is used to store the DAG that is created. The root CID
-   * of which is `token.ipnft`.
+   * Optionally a blockstore can be passed to store the DAG that is created. The
+   * root CID of the DAG is `token.ipnft`.
    *
    * @example
    * ```js
-   * const cat = new File([], 'cat.png')
-   * const kitty = new File([], 'kitty.png')
+   * const cat = new File(['...'], 'cat.png')
+   * const kitty = new File(['...'], 'kitty.png')
    * const token = await Token.fromTokenInput({
    *   name: 'hello'
    *   image: cat
@@ -72,7 +73,7 @@ export class Token {
    *       image: kitty
    *     }
    *   }
-   * }, blockstore)
+   * })
    * ```
    *
    * @template {API.TokenInput} T
@@ -84,7 +85,13 @@ export class Token {
   static async fromTokenInput(input, options = {}) {
     const blockstore = options.blockstore || new Blockstore()
     try {
-      const [blobs, meta] = mapValueWith(input, isBlob, encodeBlob, new Map(), [])
+      const [blobs, meta] = mapValueWith(
+        input,
+        isBlob,
+        encodeBlob,
+        new Map(),
+        []
+      )
       /** @type {API.Encoded<T, [[Blob, URL]]>} */
       const data = JSON.parse(JSON.stringify(meta))
       /** @type {API.Encoded<T, [[Blob, CID]]>} */
@@ -165,7 +172,7 @@ export const decode = ({ ipnft, url, data }, paths) =>
  * @param {any} value
  * @returns {value is URL}
  */
-const isURL = value => value instanceof URL
+const isURL = (value) => value instanceof URL
 
 /**
  * @template State
@@ -186,7 +193,7 @@ const embedURL = (context, url) => [context, toGatewayURL(url, context)]
  * @param {any} value
  * @returns {value is object}
  */
-const isObject = value => typeof value === 'object' && value != null
+const isObject = (value) => typeof value === 'object' && value != null
 
 /**
  * @param {any} value
@@ -233,14 +240,8 @@ const isEncodedURL = (value, assetPaths, path) =>
  * @param {API.Encoded<T, [[Blob, Blob]]>} input
  * @returns {FormData}
  */
- export const encode = (input) => {
-  const [map, meta] = mapValueWith(
-    input,
-    isBlob,
-    encodeBlob,
-    new Map(),
-    []
-  )
+export const encode = (input) => {
+  const [map, meta] = mapValueWith(input, isBlob, encodeBlob, new Map(), [])
   const form = new FormData()
   for (const [k, v] of map.entries()) {
     form.set(k, v)
@@ -264,7 +265,7 @@ const encodeBlob = (data, blob, path) => {
  * @param {any} value
  * @returns {value is Blob}
  */
-const isBlob = value => value instanceof Blob
+const isBlob = (value) => value instanceof Blob
 
 /**
  * Substitues values in the given `input` that match `p(value) == true` with
