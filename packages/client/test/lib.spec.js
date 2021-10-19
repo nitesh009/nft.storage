@@ -71,7 +71,7 @@ describe('client', () => {
       try {
         await client.storeBlob(blob, { maxRetries: 0 })
         assert.unreachable('sholud have failed')
-      } catch (error) {
+      } catch (/** @type {any} */ error) {
         assert.ok(error instanceof Error)
         assert.match(error, /Unauthorized/)
       }
@@ -83,7 +83,8 @@ describe('client', () => {
       try {
         await client.storeBlob(new Blob(['blobby']), { maxRetries: 0 })
         assert.unreachable('should have thrown')
-      } catch (err) {
+      } catch (/** @type {any} */ err) {
+        assert.ok(err instanceof Error)
         assert.is(err.message, 'missing token')
       }
     })
@@ -93,7 +94,8 @@ describe('client', () => {
       try {
         await client.storeBlob(new Blob([]), { maxRetries: 0 })
         assert.unreachable('should have thrown')
-      } catch (err) {
+      } catch (/** @type {any} */ err) {
+        assert.ok(err instanceof Error)
         assert.match(err.message, /provide some content/)
       }
     })
@@ -225,7 +227,7 @@ describe('client', () => {
       try {
         await client.storeDirectory([new File([], 'empty.txt')])
         assert.unreachable('should fail if no content is provided')
-      } catch (error) {
+      } catch (/** @type {any} */ error) {
         assert.ok(error instanceof Error)
         assert.match(error, /provide some content/i)
       }
@@ -236,7 +238,7 @@ describe('client', () => {
       try {
         await client.storeDirectory([])
         assert.unreachable('should fail if no content is provided')
-      } catch (error) {
+      } catch (/** @type {any} */ error) {
         assert.ok(error instanceof Error)
         assert.match(error, /provide some content/i)
       }
@@ -247,7 +249,7 @@ describe('client', () => {
       try {
         await client.storeDirectory([new File([], 'empty.txt')])
         assert.unreachable('should fail if no content is provided')
-      } catch (error) {
+      } catch (/** @type {any} */ error) {
         assert.ok(error instanceof Error)
         assert.match(error, /provide some content/i)
       }
@@ -261,7 +263,8 @@ describe('client', () => {
           maxRetries: 0,
         })
         assert.unreachable('should have thrown')
-      } catch (err) {
+      } catch (/** @type {any} */ err) {
+        assert.ok(err instanceof Error)
         assert.is(err.message, 'missing token')
       }
     })
@@ -273,7 +276,7 @@ describe('client', () => {
           maxRetries: 0,
         })
         assert.unreachable('sholud have failed')
-      } catch (error) {
+      } catch (/** @type {any} */ error) {
         assert.ok(error instanceof Error)
         assert.match(error, /Unauthorized/)
       }
@@ -287,7 +290,7 @@ describe('client', () => {
         // @ts-expect-error
         await client.store({})
         assert.unreachable('should have failed')
-      } catch (error) {
+      } catch (/** @type {any} */ error) {
         assert.ok(error instanceof TypeError)
         assert.match(
           error,
@@ -302,7 +305,7 @@ describe('client', () => {
         // @ts-expect-error
         const t = await client.store({ name: 'name' })
         assert.unreachable('sholud have failed')
-      } catch (error) {
+      } catch (/** @type {any} */ error) {
         assert.ok(error instanceof TypeError)
         assert.match(
           error,
@@ -317,7 +320,7 @@ describe('client', () => {
         // @ts-expect-error
         await client.store({ name: 'name', description: 'stuff' })
         assert.unreachable('sholud have failed')
-      } catch (error) {
+      } catch (/** @type {any} */ error) {
         assert.ok(error instanceof TypeError)
         assert.match(error, /property `image` must be a Blob or File/)
       }
@@ -367,7 +370,7 @@ describe('client', () => {
           // @ts-expect-error
           decimals: 'foo',
         })
-      } catch (error) {
+      } catch (/** @type {any} */ error) {
         assert.ok(error instanceof TypeError)
         assert.match(error, /property `decimals` must be an integer value/)
       }
@@ -386,7 +389,7 @@ describe('client', () => {
           { maxRetries: 0 }
         )
         assert.unreachable('should have failed')
-      } catch (error) {
+      } catch (/** @type {any} */ error) {
         assert.ok(error instanceof Error)
         assert.match(error, /Unauthorized/)
       }
@@ -580,7 +583,8 @@ describe('client', () => {
       try {
         await client.status(cid)
         assert.unreachable('Expected to fail')
-      } catch (error) {
+      } catch (/** @type {any} */ error) {
+        assert.ok(error instanceof Error)
         assert.ok(error.message.match(/not found/))
       }
     })
@@ -593,7 +597,8 @@ describe('client', () => {
           'bafkreihujckc4hvdm5qjss3wvyh2zmbxmbdhqh67dsrfezu3d6yvx36u4i'
         )
         assert.unreachable('should have thrown')
-      } catch (err) {
+      } catch (/** @type {any} */ err) {
+        assert.ok(err instanceof Error)
         assert.is(err.message, 'missing token')
       }
     })
@@ -666,7 +671,8 @@ describe('client', () => {
       try {
         await client.status(cid)
         assert.unreachable('should be gone')
-      } catch (error) {
+      } catch (/** @type {any} */ error) {
+        assert.ok(error instanceof Error)
         assert.ok(error.message.includes('not found'))
       }
     })
@@ -676,7 +682,7 @@ describe('client', () => {
       try {
         await client.delete('foo')
         assert.unreachable('invalid cid')
-      } catch (error) {
+      } catch (/** @type {any} */ error) {
         assert.ok(error instanceof Error)
         assert.match(error, /parse non base32/)
       }
@@ -692,7 +698,8 @@ describe('client', () => {
         )
         await client.delete(cid)
         assert.unreachable('should have thrown')
-      } catch (err) {
+      } catch (/** @type {any} */ err) {
+        assert.ok(err instanceof Error)
         assert.is(err.message, 'missing token')
       }
     })
@@ -727,7 +734,8 @@ describe('client', () => {
       try {
         await client.check(cid)
         assert.unreachable('Expected to fail')
-      } catch (error) {
+      } catch (/** @type {any} */ error) {
+        assert.ok(error instanceof Error)
         assert.ok(error.message.match(/not found/))
       }
     })
