@@ -1,0 +1,12 @@
+version: '3.6'
+
+services:
+  rest:
+    extends:
+      file: packages/api/db/docker/docker-compose.yml
+      service: rest
+
+  db:
+    extends:
+      file: packages/api/db/docker/docker-compose.yml
+      service: db

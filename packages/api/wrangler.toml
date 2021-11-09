@@ -171,3 +171,22 @@ CLUSTER_API_URL = "https://ze-cluster-api-nft-storage.loca.lt"
 CLUSTER_IPFS_PROXY_API_URL = "https://ze-ipfs-proxy-api-nft-storage.loca.lt"
 CLUSTER_ADDRS = ""
 DATABASE_URL = "http://localhost:8000"
+
+
+[env.yusef]
+name="nft-storage-yusef"
+account_id="8c3da25233263bd7a26c0e2e04569ded"
+workers_dev = true
+usage_model="bundled"
+route = ""
+zone_id = ""
+kv_namespaces = [
+]
+
+[env.yusef.vars]
+ENV = "dev"
+DEBUG = "*"
+CLUSTER_API_URL = "https://nft.storage.ipfscluster.io/api/"
+CLUSTER_IPFS_PROXY_API_URL = ""
+CLUSTER_ADDRS = ""
+DATABASE_URL = "http://localhost:8000"
