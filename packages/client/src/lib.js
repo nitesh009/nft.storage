@@ -15,7 +15,7 @@
  */
 
 import { transform } from 'streaming-iterables'
-import pRetry from 'p-retry'
+import pRetry, { AbortError } from 'p-retry'
 import { TreewalkCarSplitter } from 'carbites/treewalk'
 import { pack } from 'ipfs-car/pack'
 import { CID } from 'multiformats/cid'
@@ -78,37 +78,16 @@ class NFTStorage {
     if (!token) throw new Error('missing token')
     return { Authorization: `Bearer ${token}` }
   }
+
   /**
    * @param {API.Service} service
    * @param {Blob} blob
-   * @param {API.BlobStorerOptions} [options]
    * @returns {Promise<API.CIDString>}
    */
-  static async storeBlob(
-    service,
-    blob,
-    { onRootCidReady, onStoredChunk, maxRetries } = {}
-  ) {
-    if (blob.size === 0) {
-      throw new Error('Content size is 0, make sure to provide some content')
-    }
-    const blockstore = new Blockstore()
-    try {
-      const { root } = await pack({
-        // @ts-ignore
-        input: [{ path: 'blob', content: blob.stream() }],
-        blockstore,
-        wrapWithDirectory: false,
-      })
-      onRootCidReady && onRootCidReady(root.toString())
-      const car = new BlockstoreCarReader(1, [root], blockstore)
-      return await NFTStorage.storeCar(service, car, {
-        onStoredChunk,
-        maxRetries,
-      })
-    } finally {
-      await blockstore.close()
-    }
+  static async storeBlob(service, blob) {
+    const { cid, car } = await NFTStorage.encodeBlob(blob)
+    await NFTStorage.storeCar(service, car)
+    return cid.toString()
   }
 
   /**
@@ -122,7 +101,8 @@ class NFTStorage {
     car,
     { onStoredChunk, maxRetries } = {}
   ) {
-    const url = new URL(`upload/`, endpoint)
+    const url = new URL('upload/', endpoint)
+    const headers = NFTStorage.auth(token)
     const targetSize = MAX_CHUNK_SIZE
     const splitter =
       car instanceof Blob
@@ -141,16 +121,22 @@ class NFTStorage {
           async () => {
             const response = await fetch(url.toString(), {
               method: 'POST',
-              headers: NFTStorage.auth(token),
+              headers,
               body: carFile,
             })
             const result = await response.json()
             if (!result.ok) {
+              // do not retry if unauthorized - will not succeed
+              if (response.status === 401) {
+                throw new AbortError(result.error.message)
+              }
               throw new Error(result.error.message)
             }
             return result.value.cid
           },
-          { retries: maxRetries == null ? MAX_STORE_RETRIES : maxRetries }
+          {
+            retries: maxRetries == null ? MAX_STORE_RETRIES : maxRetries,
+          }
         )
         onStoredChunk && onStoredChunk(carFile.size)
         return cid
@@ -168,74 +154,24 @@ class NFTStorage {
   /**
    * @param {API.Service} service
    * @param {Iterable<File>} files
-   * @param {API.DirectoryStorerOptions} [options]
    * @returns {Promise<API.CIDString>}
    */
-  static async storeDirectory(
-    service,
-    files,
-    { onRootCidReady, onStoredChunk, maxRetries } = {}
-  ) {
-    const input = []
-    let size = 0
-    for (const file of files) {
-      input.push({ path: file.name, content: file.stream() })
-      size += file.size
-    }
-
-    if (size === 0) {
-      throw new Error(
-        'Total size of files should exceed 0, make sure to provide some content'
-      )
-    }
-
-    const blockstore = new Blockstore()
-    try {
-      const { root } = await pack({
-        // @ts-ignore
-        input,
-        blockstore,
-        wrapWithDirectory: true,
-      })
-      onRootCidReady && onRootCidReady(root.toString())
-      const car = new BlockstoreCarReader(1, [root], blockstore)
-      return await NFTStorage.storeCar(service, car, {
-        onStoredChunk,
-        maxRetries,
-      })
-    } finally {
-      await blockstore.close()
-    }
+  static async storeDirectory(service, files) {
+    const { cid, car } = await NFTStorage.encodeDirectory(files)
+    await NFTStorage.storeCar(service, car)
+    return cid.toString()
   }
 
   /**
    * @template {API.TokenInput} T
    * @param {API.Service} service
-   * @param {T} input
-   * @param {API.MetadataStorerOptions} [options]
+   * @param {API.Encoded<T, [[Blob, Blob]]>} input
    * @returns {Promise<API.Token<T>>}
    */
-  static async store(
-    service,
-    input,
-    { onRootCidReady, onStoredChunk, maxRetries } = {}
-  ) {
-    validateERC1155(input)
-    const blockstore = new Blockstore()
-    try {
-      const token = await Token.Token.fromTokenInput(input, { blockstore })
-      onRootCidReady && onRootCidReady(token.ipnft)
-      const car = new BlockstoreCarReader(
-        1,
-        [CID.parse(token.ipnft)],
-        blockstore
-      )
-      await NFTStorage.storeCar(service, car, { onStoredChunk, maxRetries })
-      // @ts-ignore
-      return token
-    } finally {
-      await blockstore.close()
-    }
+  static async store(service, input) {
+    const { token, car } = await NFTStorage.encodeNFT(input)
+    await NFTStorage.storeCar(service, car)
+    return token
   }
 
   /**
@@ -302,6 +238,63 @@ class NFTStorage {
     }
   }
 
+  /**
+   * @template {API.TokenInput} T
+   * @param {API.Encoded<T, [[Blob, Blob]]>} input
+   */
+  static async encodeNFT(input) {
+    validateERC1155(input)
+    return Token.Token.encode(input)
+  }
+
+  /**
+   * @param {Blob} blob
+   * @returns {Promise<{ cid: CID, car: import('./lib/interface.js').CarReader }>}
+   */
+  static async encodeBlob(blob) {
+    if (blob.size === 0) {
+      throw new Error('Content size is 0, make sure to provide some content')
+    }
+    const blockstore = new Blockstore()
+    const { root: cid } = await pack({
+      // @ts-ignore
+      input: [{ path: 'blob', content: blob.stream() }],
+      blockstore,
+      wrapWithDirectory: false,
+    })
+    const car = new BlockstoreCarReader(1, [cid], blockstore)
+    return { cid, car }
+  }
+
+  /**
+   * @param {Iterable<File>} files
+   * @returns {Promise<{ cid: CID, car: import('./lib/interface.js').CarReader }>}
+   */
+  static async encodeDirectory(files) {
+    const input = []
+    let size = 0
+    for (const file of files) {
+      input.push({ path: file.name, content: file.stream() })
+      size += file.size
+    }
+
+    if (size === 0) {
+      throw new Error(
+        'Total size of files should exceed 0, make sure to provide some content'
+      )
+    }
+
+    const blockstore = new Blockstore()
+    const { root: cid } = await pack({
+      // @ts-ignore
+      input,
+      blockstore,
+      wrapWithDirectory: true,
+    })
+    const car = new BlockstoreCarReader(1, [cid], blockstore)
+    return { cid, car }
+  }
+
   // Just a sugar so you don't have to pass around endpoint and token around.
 
   /**
@@ -318,11 +311,11 @@ class NFTStorage {
    * ```
    *
    * @param {Blob} blob
-   * @param {API.BlobStorerOptions} [options]
    */
-  storeBlob(blob, options) {
-    return NFTStorage.storeBlob(this, blob, options)
+  storeBlob(blob) {
+    return NFTStorage.storeBlob(this, blob)
   }
+
   /**
    * Stores files encoded as a single [Content Addressed Archive
    * (CAR)](https://github.com/ipld/specs/blob/master/block-layer/content-addressable-archives.md).
@@ -363,6 +356,7 @@ class NFTStorage {
   storeCar(car, options) {
     return NFTStorage.storeCar(this, car, options)
   }
+
   /**
    * Stores a directory of files and returns a CID for the directory.
    *
@@ -379,11 +373,11 @@ class NFTStorage {
    * instance as well, in which case directory structure will be retained.
    *
    * @param {Iterable<File>} files
-   * @param {API.DirectoryStorerOptions} [options]
    */
-  storeDirectory(files, options) {
-    return NFTStorage.storeDirectory(this, files, options)
+  storeDirectory(files) {
+    return NFTStorage.storeDirectory(this, files)
   }
+
   /**
    * Returns current status of the stored NFT by its CID. Note the NFT must
    * have previously been stored by this account.
@@ -398,6 +392,7 @@ class NFTStorage {
   status(cid) {
     return NFTStorage.status(this, cid)
   }
+
   /**
    * Removes stored content by its CID from the service.
    *
@@ -414,6 +409,7 @@ class NFTStorage {
   delete(cid) {
     return NFTStorage.delete(this, cid)
   }
+
   /**
    * Check if a CID of an NFT is being stored by nft.storage. Throws if the NFT
    * was not found.
@@ -428,6 +424,7 @@ class NFTStorage {
   check(cid) {
     return NFTStorage.check(this, cid)
   }
+
   /**
    * Stores the given token and all resources it references (in the form of a
    * File or a Blob) along with a metadata JSON as specificed in
@@ -466,16 +463,15 @@ class NFTStorage {
    *
    * @template {API.TokenInput} T
    * @param {T} token
-   * @param {API.MetadataStorerOptions} [options]
-   * @returns {Promise<API.Token<T>>}
    */
-  store(token, options) {
-    return NFTStorage.store(this, token, options)
+  store(token) {
+    return NFTStorage.store(this, token)
   }
 }
 
 /**
- * @param {API.TokenInput} metadata
+ * @template {API.TokenInput} T
+ * @param {API.Encoded<T, [[Blob, Blob]]>} metadata
  */
 const validateERC1155 = ({ name, description, image, decimals }) => {
   // Just validate that expected fields are present

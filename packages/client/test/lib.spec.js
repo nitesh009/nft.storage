@@ -2,6 +2,8 @@ import { CarReader } from '@ipld/car'
 import * as assert from 'uvu/assert'
 import { NFTStorage, Blob, File, Token } from 'nft.storage'
 import { CID } from 'multiformats'
+import { sha256 } from 'multiformats/hashes/sha2'
+import * as raw from 'multiformats/codecs/raw'
 import { pack } from 'ipfs-car/pack'
 import { randomCar } from './helpers.js'
 
@@ -36,21 +38,6 @@ describe('client', () => {
       )
     })
 
-    it('callback with root CID', async () => {
-      let called = false
-      const client = new NFTStorage({ token, endpoint })
-      await client.storeBlob(new Blob(['hello world']), {
-        onRootCidReady: (root) => {
-          called = true
-          assert.equal(
-            root,
-            'bafkreifzjut3te2nhyekklss27nh3k72ysco7y32koao5eei66wof36n5e'
-          )
-        },
-      })
-      assert.ok(called)
-    })
-
     it('can upload twice', async () => {
       const client = new NFTStorage({ token, endpoint })
       const blob = new Blob(['upload twice'])
@@ -64,13 +51,13 @@ describe('client', () => {
       assert.equal(status1.created, status2.created, 'dates match')
     })
 
-    it('errors with invalid token', async () => {
+    it('errors with invalid token', async function () {
       const client = new NFTStorage({ token: 'wrong', endpoint })
       const blob = new Blob(['upload twice'])
 
       try {
-        await client.storeBlob(blob, { maxRetries: 0 })
-        assert.unreachable('sholud have failed')
+        await client.storeBlob(blob)
+        assert.unreachable('should have failed')
       } catch (/** @type {any} */ error) {
         assert.ok(error instanceof Error)
         assert.match(error, /Unauthorized/)
@@ -81,7 +68,7 @@ describe('client', () => {
       // @ts-expect-error - token option is expected
       const client = new NFTStorage({ endpoint })
       try {
-        await client.storeBlob(new Blob(['blobby']), { maxRetries: 0 })
+        await client.storeBlob(new Blob(['blobby']))
         assert.unreachable('should have thrown')
       } catch (/** @type {any} */ err) {
         assert.ok(err instanceof Error)
@@ -167,6 +154,22 @@ describe('client', () => {
       assert.ok(uploadedChunks >= 12)
       assert.equal(cid, expectedCid)
     })
+
+    it('handles server error', async () => {
+      const client = new NFTStorage({ token, endpoint })
+      const bytes = new TextEncoder().encode('throw an error')
+      const hash = await sha256.digest(bytes)
+      const cid = CID.create(1, raw.code, hash)
+      const carReader = new CarReader(1, [cid], [{ cid, bytes }])
+
+      try {
+        await client.storeCar(carReader, { maxRetries: 0 })
+        assert.unreachable('should have thrown')
+      } catch (/** @type {any} */ err) {
+        assert.ok(err instanceof Error)
+        assert.is(err.message, 'throwing an error for tests')
+      }
+    })
   })
 
   describe('upload dir', () => {
@@ -196,30 +199,6 @@ describe('client', () => {
         cid,
         'bafybeigkms36pnnjsa7t2mq2g4mx77s4no2hilirs4wqx3eebbffy2ay3a'
       )
-    })
-
-    it('callback with root CID', async () => {
-      let called = false
-      const client = new NFTStorage({ token, endpoint })
-      await client.storeDirectory(
-        [
-          new File(['hello world'], 'hello.txt'),
-          new File(
-            [JSON.stringify({ from: 'incognito' }, null, 2)],
-            'metadata.json'
-          ),
-        ],
-        {
-          onRootCidReady: (root) => {
-            called = true
-            assert.equal(
-              root,
-              'bafybeigkms36pnnjsa7t2mq2g4mx77s4no2hilirs4wqx3eebbffy2ay3a'
-            )
-          },
-        }
-      )
-      assert.ok(called)
     })
 
     it('upload empty files', async () => {
@@ -426,28 +405,6 @@ describe('client', () => {
       assert.equal(embed.description, 'stuff')
       assert.ok(embed.image instanceof URL)
       assert.ok(embed.image.protocol, 'https:')
-    })
-
-    it('callback with root CID', async () => {
-      let called = false
-      const client = new NFTStorage({ token, endpoint })
-      await client.store(
-        {
-          name: 'name',
-          description: 'stuff',
-          image: new Blob(['fake image'], { type: 'image/png' }),
-        },
-        {
-          onRootCidReady: (root) => {
-            called = true
-            assert.equal(
-              root,
-              'bafyreib75ot3oyo43f7rhdk6xlv7c4mmjwhbjjnugrw3yqjvarpvtzxkoi'
-            )
-          },
-        }
-      )
-      assert.ok(called)
     })
 
     it('store with properties', async () => {
