@@ -1,0 +1,7 @@
+{
+  "dockerComposeFile": ["./docker-compose.yml", "./docker-compose.db.yml"],
+  "service": "dev",
+  "workspaceFolder": "/src",
+  "forwardPorts": [3000, 5432, 9094, 9095, 8787],
+  "postCreateCommand": ["yarn", "install"]
+}
