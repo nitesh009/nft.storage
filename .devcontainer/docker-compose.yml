@@ -18,6 +18,8 @@ services:
       dockerfile: .devcontainer/Dockerfile
     volumes:
       - "..:/workspace"
+    environment:
+      DEV_USERNAME: "${USER}"
     # Runs app on the same network as the database container, allows "forwardPorts" in devcontainer.json function.
     network_mode: service:db
 
