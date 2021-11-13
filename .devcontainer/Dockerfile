@@ -5,4 +5,6 @@ USER node
 # install wrangler cli globally
 RUN npm install -g @cloudflare/wrangler
 
-WORKDIR /src
+WORKDIR /workspace
+
+ENTRYPOINT [ "/bin/zsh" ]

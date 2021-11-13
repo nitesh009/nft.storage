@@ -11,13 +11,17 @@ version: '3.6'
 
 services:
 
-  # a container based on node:17 that has all our dependencies pre-installed
-  # including the wrangler cli for working with cloudflare
+  # a 
   dev:
     build:
       context: .
     volumes:
-      - "../:/src"
+      - "../:/workspace:cached"
+    # Overrides default command so things don't shut down after the process ends.
+    command: sleep infinity
+
+    # Runs app on the same network as the database container, allows "forwardPorts" in devcontainer.json function.
+    network_mode: service:db
 
   # IPFS node used by cluster node
   ipfs0:
