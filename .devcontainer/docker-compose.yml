@@ -75,9 +75,9 @@ services:
   postgrest-tunnel:
     environment:
       PORT: "3000"
-      LOCAL_HOST: "postgrest"
+      LOCAL_HOST: "rest"
       SUBDOMAIN: "${USER}-postgrest-${DEV_CLUSTER_PROJECT:-nft-storage}"
     depends_on:
-      - postgrest
+      - rest
     build:
       context: ./localtunnel
