@@ -4,4 +4,4 @@
 DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
 cd $DIR
 
-docker-compose -f docker-compose.yml -f docker-compose.db.yml "$@"
+docker-compose -f docker-compose.yml -f docker-compose.db.yml -f docker-compose.extend.yml "$@"
