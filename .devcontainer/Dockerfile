@@ -7,4 +7,4 @@ RUN npm install -g @cloudflare/wrangler
 
 WORKDIR /workspace
 
-ENTRYPOINT [ "/bin/zsh" ]
+CMD sleep infinity 
