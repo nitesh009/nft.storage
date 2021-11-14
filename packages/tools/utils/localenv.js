@@ -23,7 +23,8 @@ const REQUIRED_VARS = [
   {
     name: 'DATABASE_URL',
     desc: 'URL of postgrest DB api for local development.',
-    defaultValue: 'http://localhost:3000',
+    defaultValue: `https://${process.env.DEV_USERNAME ||
+      process.env.USER}-postgrest-nft-storage.loca.lt`,
   },
   {
     name: 'DATABASE_CONNECTION',
