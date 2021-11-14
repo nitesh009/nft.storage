@@ -6,4 +6,4 @@ cd /workspace
 
 yarn install
 
-# node packages/tools/cli.js local-env-check
+node packages/tools/cli.js local-env-check
