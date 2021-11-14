@@ -112,7 +112,11 @@ class LocalEnv {
     }
 
     if (envOk && wranglerOk) {
-      console.log('everything looks okay.')
+      console.log('Everything looks okay!')
+      console.log(
+        'If this is a new dev env, run the following to setup the db:'
+      )
+      console.log('node ./packages/api/scripts/cli.js db-sql --cargo --testing')
     } else {
       console.error(
         'Your config seems to have errors. Please address the issues printed above and try again'
